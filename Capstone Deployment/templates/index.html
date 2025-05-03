@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minor Key Classifier</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .upload-container {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        #audioPreview {
+            margin: 20px auto;
+            display: none;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .prediction {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .confidence {
+            font-size: 18px;
+            color: #555;
+        }
+        .probabilities {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .probability-bar {
+            width: 20px;
+            margin: 0 2px;
+            background-color: #4CAF50;
+            position: relative;
+        }
+        .probability-label {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Minor Key Classifier</h1>
+    <p>Upload an audio file (.wav, .mp3) to classify it</p>
+    
+    <div class="upload-container">
+        <input type="file" id="audioUpload" accept="audio/*">
+        <button onclick="predictAudio()">Classify Audio</button>
+        <audio id="audioPreview" controls></audio>
+    </div>
+    
+    <div id="result">
+        <div class="prediction">Predicted Class: <span id="predictedClass"></span></div>
+        <div class="confidence">Confidence: <span id="confidence"></span>%</div>
+        <div class="probabilities" id="probabilityBars"></div>
+    </div>
+
+    <script>
+
+        const classToMinorKey = {
+            0: 'A',
+            1: 'Ab',
+            2: 'B',
+            3: 'Bb',
+            4: 'C',
+            5: 'D',
+            6: 'Db',
+            7: 'E',
+            8: 'Eb',
+            9: 'F',
+            10: 'G',
+            11: 'Gb'
+        };
+
+
+        // Display audio preview when file is selected
+        document.getElementById('audioUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const preview = document.getElementById('audioPreview');
+                preview.src = URL.createObjectURL(file);
+                preview.style.display = 'block';
+                document.getElementById('result').style.display = 'none';
+            }
+        });
+
+        async function predictAudio() {
+            const fileInput = document.getElementById('audioUpload');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select an audio file first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('http://localhost:8000/predict-upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                displayResult(result);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error classifying the audio. Please try again.');
+            }
+        }
+
+        function displayResult(result) {
+            // document.getElementById('predictedClass').textContent = result.predicted_class;
+            document.getElementById('predictedClass').textContent = classToMinorKey[result.predicted_class] || result.predicted_class;
+
+            document.getElementById('confidence').textContent = (result.confidence * 100).toFixed(2);
+            
+            // Create probability bars
+            const probabilityBars = document.getElementById('probabilityBars');
+            probabilityBars.innerHTML = '';
+            
+            result.all_predictions.forEach((prob, index) => {
+                const barContainer = document.createElement('div');
+                barContainer.style.display = 'flex';
+                barContainer.style.flexDirection = 'column';
+                barContainer.style.alignItems = 'center';
+                barContainer.style.margin = '0 5px';
+                
+                const bar = document.createElement('div');
+                bar.className = 'probability-bar';
+                bar.style.height = `${prob * 200}px`;
+                bar.style.opacity = prob;
+                
+                const label = document.createElement('div');
+                label.className = 'probability-label';
+                label.textContent = index;
+                
+                barContainer.appendChild(bar);
+                barContainer.appendChild(label);
+                probabilityBars.appendChild(barContainer);
+            });
+            
+            document.getElementById('result').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
